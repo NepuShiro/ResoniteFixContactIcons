@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<RootNamespace>ExampleMod</RootNamespace>
-		<AssemblyName>ExampleMod</AssemblyName>
+		<RootNamespace>ResoniteFixContactIcons</RootNamespace>
+		<AssemblyName>ResoniteFixContactIcons</AssemblyName>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<TargetFramework>net472</TargetFramework>
 		<FileAlignment>512</FileAlignment>
