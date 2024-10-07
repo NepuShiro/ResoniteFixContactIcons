@@ -18,7 +18,7 @@ namespace ResoniteFixContactIcons
         public override string Name => "ResoniteFixContactIcons";
         public override string Author => "NepuShiro";
         public override string Version => VERSION_CONSTANT;
-        public override string Link => "https://git.nepu.men/NepuShiro/ResoniteFixContactIcons/";
+        public override string Link => "https://github.com/NepuShiro/ResoniteFixContactIcons/";
 
         public override void OnEngineInit()
         {
