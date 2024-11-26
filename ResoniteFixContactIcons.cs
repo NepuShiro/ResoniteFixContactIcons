@@ -14,15 +14,14 @@ namespace ResoniteFixContactIcons
 {
     public class ResoniteFixContactIcons : ResoniteMod
     {
-        internal const string VERSION_CONSTANT = "1.0.0";
         public override string Name => "ResoniteFixContactIcons";
         public override string Author => "NepuShiro";
-        public override string Version => VERSION_CONSTANT;
+        public override string Version => "1.0.1";
         public override string Link => "https://github.com/NepuShiro/ResoniteFixContactIcons/";
 
         public override void OnEngineInit()
         {
-            Harmony harmony = new("com.NepuShiro.ResoniteFixContactIcons");
+            Harmony harmony = new("net.NepuShiro.ResoniteFixContactIcons");
             harmony.PatchAll();
         }
 
@@ -31,20 +30,19 @@ namespace ResoniteFixContactIcons
         public class AddNotificationPatch
         {
             [HarmonyPrefix]
-            static void Prefix(ref string userId, ref Uri overrideProfile)
+            private static void Prefix(NotificationPanel __instance, ref string userId, ref Uri overrideProfile)
             {
                 Uri newOverrideProfile = null;
                 string inUserId = userId;
-
-                Task.Run(async () =>
+                
+                __instance.StartTask(async delegate
                 {
-                    var cloudUserProfile = (await Engine.Current.Cloud.Users.GetUser(inUserId))?.Entity?.Profile;
-                    if (Uri.TryCreate(cloudUserProfile?.IconUrl, UriKind.Absolute, out var result))
+                    if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(inUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
                     {
                         newOverrideProfile = result;
                     }
                 }).GetAwaiter().GetResult();
-
+                
                 if (newOverrideProfile != null)
                 {
                     overrideProfile = newOverrideProfile;
@@ -52,24 +50,23 @@ namespace ResoniteFixContactIcons
             }
         }
 
-        [HarmonyPatch(typeof(ContactItem), nameof(ContactItem.Update))]
+        [HarmonyPatch(typeof(ContactItem), "Update")]
         [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
         public static class ContactsPagePatch
         {
             [HarmonyPostfix]
-            public static void Postfix(Contact contact, SyncRef<StaticTexture2D> ____thumbnailTexture, SyncRef<Image> ____thumbnail)
+            public static void Postfix(ContactItem __instance, Contact contact, SyncRef<StaticTexture2D> ____thumbnailTexture, SyncRef<Image> ____thumbnail)
             {
-                Task.Run(async () =>
+                __instance.StartTask(async delegate
                 {
                     if (____thumbnailTexture.Target.URL.Value == null)
                     {
-                        var cloudUserProfile = (await Engine.Current.Cloud.Users.GetUser(contact.ContactUserId))?.Entity?.Profile;
-                        if (Uri.TryCreate(cloudUserProfile?.IconUrl, UriKind.Absolute, out var result))
+                        if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(contact.ContactUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
                         {
                             ____thumbnailTexture.Target.URL.Value = result;
                             ____thumbnail.Target.Tint.Value = colorX.White;
                         }
-
+                        
                         if (____thumbnailTexture.Target.URL.Value == null)
                         {
                             ____thumbnailTexture.Target.URL.Value = OfficialAssets.Graphics.Thumbnails.AnonymousHeadset;
@@ -82,9 +79,10 @@ namespace ResoniteFixContactIcons
             [HarmonyTranspiler]
             public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
-                List<CodeInstruction> codes = new(instructions);
+                List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
                 for (int i = 0; i < codes.Count; i++)
                 {
+                    // I know this is cursed, but it works :)
                     if (codes[i].opcode == OpCodes.Ldarg_0 &&
                         codes[i + 1].opcode == OpCodes.Ldfld &&
                         codes[i + 2].opcode == OpCodes.Callvirt &&
@@ -108,7 +106,7 @@ namespace ResoniteFixContactIcons
                         Msg($"Replaced the No-Bueno Icon Code at [{i}] {codes[i]} - [{i + 14}] {codes[i + 14]}");
                     }
                 }
-
+                
                 return codes.AsEnumerable();
             }
         }
