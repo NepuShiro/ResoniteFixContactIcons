@@ -35,7 +35,7 @@ namespace ResoniteFixContactIcons
                 Uri newOverrideProfile = null;
                 string inUserId = userId;
                 
-                __instance.StartTask(async delegate
+                Task.Run(async delegate
                 {
                     if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(inUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
                     {
@@ -57,7 +57,7 @@ namespace ResoniteFixContactIcons
             [HarmonyPostfix]
             public static void Postfix(ContactItem __instance, Contact contact, SyncRef<StaticTexture2D> ____thumbnailTexture, SyncRef<Image> ____thumbnail)
             {
-                __instance.StartTask(async delegate
+                Task.Run(async delegate
                 {
                     if (____thumbnailTexture.Target.URL.Value == null)
                     {
