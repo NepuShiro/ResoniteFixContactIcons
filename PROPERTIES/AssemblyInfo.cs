@@ -2,7 +2,7 @@
 
 [assembly: AssemblyTitle("ResoniteFixContactIcons")]
 [assembly: AssemblyProduct("ResoniteFixContactIcons")]
-[assembly: AssemblyDescription("Description of your mod")]
-[assembly: AssemblyCopyright("Copyright © 2024 ExampleAuthor")]
+[assembly: AssemblyDescription("Fixes the Contact PFP's in the Contacts Tab, and Notifications")]
+[assembly: AssemblyCopyright("Copyright © 2024 NepuShiro")]
 [assembly: AssemblyVersion("1.0.1")]
 [assembly: AssemblyFileVersion("1.0.1")]
