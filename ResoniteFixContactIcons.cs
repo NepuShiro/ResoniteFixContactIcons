@@ -32,21 +32,6 @@ namespace ResoniteFixContactIcons
             };
         }
 
-        [HarmonyPatch(typeof(NotificationPanel), "AddNotification")]
-        [HarmonyPatch(new Type[] { typeof(string), typeof(string), typeof(Uri), typeof(colorX), typeof(NotificationType), typeof(string), typeof(Uri), typeof(IAssetProvider<AudioClip>) })]
-        public class AddNotificationPatch
-        {
-            [HarmonyPrefix]
-            private static void Prefix(string userId, ref Uri overrideProfile)
-            {
-                if (string.IsNullOrEmpty(userId)) return;
-                if (overrideProfile != null) return;
-                
-                UserProfile profile = EnsureProfile(null, userId).GetAwaiter().GetResult();
-                overrideProfile = new Uri(profile.IconUrl);
-            }
-        }
-
         [HarmonyPatch(typeof(ContactItem), "Update")]
         [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
         public static class ContactsPagePatch
@@ -61,31 +46,25 @@ namespace ResoniteFixContactIcons
             }
         }
         
-        private static async Task<UserProfile> EnsureProfile(Contact contact = null, string userId = "")
+        private static async Task EnsureProfile(Contact contact = null, string userId = "")
         {
             try
             {
-                if (contact?.Profile != null)
-                    return null;
+                if (contact?.Profile != null) return;
 
                 if (contact == null && !string.IsNullOrEmpty(userId))
                     contact = Engine.Current.Cloud.Contacts.GetContact(userId);
 
-                if (contact == null)
-                    return null;
+                if (contact == null) return;
 
                 User user = await GetUser(contact.ContactUserId);
-                if (user?.Profile == null)
-                    return null;
+                if (user?.Profile == null) return;
 
                 contact.Profile = user.Profile;
-
-                return contact.Profile;
             }
             catch (Exception e)
             {
                 Error(e);
-                return null;
             }
         }
         
