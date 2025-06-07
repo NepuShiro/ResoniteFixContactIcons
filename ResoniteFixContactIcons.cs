@@ -5,10 +5,9 @@ using ResoniteModLoader;
 using System.Threading.Tasks;
 using System;
 using SkyFrost.Base;
-using System.Collections.Generic;
-using FrooxEngine.UIX;
-using System.Linq;
-using System.Reflection.Emit;
+using System.Net.Http;
+using System.Text.Json;
+using User = SkyFrost.Base.User;
 
 namespace ResoniteFixContactIcons
 {
@@ -21,8 +20,16 @@ namespace ResoniteFixContactIcons
 
         public override void OnEngineInit()
         {
-            Harmony harmony = new("net.NepuShiro.ResoniteFixContactIcons");
+            Harmony harmony = new Harmony("net.NepuShiro.ResoniteFixContactIcons");
             harmony.PatchAll();
+            
+            Engine.Current.OnReady += () =>
+            {
+                Engine.Current.Cloud.Contacts.ForeachContact(c =>
+                {
+                    EnsureProfile(c);
+                });
+            };
         }
 
         [HarmonyPatch(typeof(NotificationPanel), "AddNotification")]
@@ -30,23 +37,13 @@ namespace ResoniteFixContactIcons
         public class AddNotificationPatch
         {
             [HarmonyPrefix]
-            private static void Prefix(NotificationPanel __instance, ref string userId, ref Uri overrideProfile)
+            private static void Prefix(string userId, ref Uri overrideProfile)
             {
-                Uri newOverrideProfile = null;
-                string inUserId = userId;
+                if (string.IsNullOrEmpty(userId)) return;
+                if (overrideProfile != null) return;
                 
-                Task.Run(async delegate
-                {
-                    if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(inUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
-                    {
-                        newOverrideProfile = result;
-                    }
-                }).GetAwaiter().GetResult();
-                
-                if (newOverrideProfile != null)
-                {
-                    overrideProfile = newOverrideProfile;
-                }
+                UserProfile profile = EnsureProfile(null, userId).GetAwaiter().GetResult();
+                overrideProfile = new Uri(profile.IconUrl);
             }
         }
 
@@ -54,61 +51,52 @@ namespace ResoniteFixContactIcons
         [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
         public static class ContactsPagePatch
         {
-            [HarmonyPostfix]
-            public static void Postfix(ContactItem __instance, Contact contact, SyncRef<StaticTexture2D> ____thumbnailTexture, SyncRef<Image> ____thumbnail)
+            [HarmonyPrefix]
+            public static void Prefix(ContactItem __instance)
             {
-                Task.Run(async delegate
-                {
-                    if (____thumbnailTexture.Target.URL.Value == null)
-                    {
-                        if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(contact.ContactUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
-                        {
-                            ____thumbnailTexture.Target.URL.Value = result;
-                            ____thumbnail.Target.Tint.Value = colorX.White;
-                        }
-                        
-                        if (____thumbnailTexture.Target.URL.Value == null)
-                        {
-                            ____thumbnailTexture.Target.URL.Value = OfficialAssets.Graphics.Thumbnails.AnonymousHeadset;
-                            ____thumbnail.Target.Tint.Value = LegacyUIStyle.NameTint(contact.ContactUserId);
-                        }
-                    }
-                });
-            }
-
-            [HarmonyTranspiler]
-            public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-            {
-                List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
-                for (int i = 0; i < codes.Count; i++)
-                {
-                    // I know this is cursed, but it works :)
-                    if (codes[i].opcode == OpCodes.Ldarg_0 &&
-                        codes[i + 1].opcode == OpCodes.Ldfld &&
-                        codes[i + 2].opcode == OpCodes.Callvirt &&
-                        codes[i + 3].opcode == OpCodes.Ldfld &&
-                        codes[i + 4].opcode == OpCodes.Call &&
-                        codes[i + 5].opcode == OpCodes.Callvirt &&
-                        codes[i + 6].opcode == OpCodes.Ldarg_0 &&
-                        codes[i + 7].opcode == OpCodes.Ldfld &&
-                        codes[i + 8].opcode == OpCodes.Callvirt &&
-                        codes[i + 9].opcode == OpCodes.Ldfld &&
-                        codes[i + 10].opcode == OpCodes.Ldarg_1 &&
-                        codes[i + 11].opcode == OpCodes.Callvirt &&
-                        codes[i + 12].opcode == OpCodes.Ldc_R4 &&
-                        codes[i + 13].opcode == OpCodes.Call &&
-                        codes[i + 14].opcode == OpCodes.Callvirt)
-                    {
-                        for (int j = 0; j <= 14; j++)
-                        {
-                            codes[i + j].opcode = OpCodes.Nop;
-                        }
-                        Msg($"Replaced the No-Bueno Icon Code at [{i}] {codes[i]} - [{i + 14}] {codes[i + 14]}");
-                    }
-                }
+                Contact contact = __instance?.Contact ?? __instance?.Data?.Contact;
                 
-                return codes.AsEnumerable();
+                if (contact != null)
+                    EnsureProfile(contact);
             }
+        }
+        
+        private static async Task<UserProfile> EnsureProfile(Contact contact = null, string userId = "")
+        {
+            try
+            {
+                if (contact?.Profile != null)
+                    return null;
+
+                if (contact == null && !string.IsNullOrEmpty(userId))
+                    contact = Engine.Current.Cloud.Contacts.GetContact(userId);
+
+                if (contact == null)
+                    return null;
+
+                User user = await GetUser(contact.ContactUserId);
+                if (user?.Profile == null)
+                    return null;
+
+                contact.Profile = user.Profile;
+
+                return contact.Profile;
+            }
+            catch (Exception e)
+            {
+                Error(e);
+                return null;
+            }
+        }
+        
+        private static async Task<User> GetUser(string userId)
+        {
+            using HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.GetAsync($"https://api.resonite.com/users/{userId}").ConfigureAwait(false);
+
+            return response.IsSuccessStatusCode
+                ? JsonSerializer.Deserialize<User>(await response.Content.ReadAsStringAsync())
+                : null;
         }
     }
 }
