@@ -20,42 +20,62 @@ namespace ResoniteFixContactIcons
 
         public override void OnEngineInit()
         {
-            Harmony harmony = new Harmony("net.NepuShiro.ResoniteFixContactIcons");
-            harmony.PatchAll();
+            // Harmony harmony = new Harmony("net.NepuShiro.ResoniteFixContactIcons");
+            // harmony.PatchAll();
             
             Engine.Current.OnReady += () =>
             {
-                Engine.Current.Cloud.Contacts.ForeachContact(c =>
-                {
-                    EnsureProfile(c);
-                });
+                // We could probably find a Method to patch for refreshing all Contacts, but this is fine for now
+                Engine.Current.Cloud.Contacts.ForeachContact(EnsureProfile);
+                
+                Engine.Current.Cloud.Contacts.ContactRemoved += EnsureProfile;
+                Engine.Current.Cloud.Contacts.ContactAdded += EnsureProfile;
+                Engine.Current.Cloud.Contacts.ContactUpdated += EnsureProfile;
             };
         }
+        
+        // I don't think this is needed, as I can't find a good way to patch this without halting the main thread..
+        // [HarmonyPatch(typeof(NotificationPanel), "AddNotification")]
+        // [HarmonyPatch(new Type[] { typeof(string), typeof(string), typeof(Uri), typeof(colorX), typeof(NotificationType), typeof(string), typeof(Uri), typeof(IAssetProvider<AudioClip>) })]
+        // public class AddNotificationPatch
+        // {
+        //     [HarmonyPrefix]
+        //     private static void Prefix(string userId, ref Uri overrideProfile)
+        //     {
+        //         if (string.IsNullOrEmpty(userId)) return;
+        //         if (overrideProfile != null) return;
+        //         
+        //         UserProfile profile = EnsureProfile(null, userId).GetAwaiter().GetResult();
+        //         overrideProfile = new Uri(profile.IconUrl);
+        //     }
+        // }
 
-        [HarmonyPatch(typeof(ContactItem), "Update")]
-        [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
-        public static class ContactsPagePatch
+        // There could be a better Method to patch instead of the Contacts Panel to update the Profiles
+        // We might not even need this
+        // [HarmonyPatch(typeof(ContactItem), "Update")]
+        // [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
+        // public static class ContactsPagePatch
+        // {
+        //     [HarmonyPrefix]
+        //     public static void Prefix(ContactItem __instance)
+        //     {
+        //         Contact contact = __instance?.Contact ?? __instance?.Data?.Contact;
+        //         
+        //         if (contact != null)
+        //             EnsureProfile(contact);
+        //     }
+        // }
+        
+        private static void EnsureProfile(ContactData cd)
         {
-            [HarmonyPrefix]
-            public static void Prefix(ContactItem __instance)
-            {
-                Contact contact = __instance?.Contact ?? __instance?.Data?.Contact;
-                
-                if (contact != null)
-                    EnsureProfile(contact);
-            }
+            EnsureProfile(cd.Contact);
         }
         
-        private static async Task EnsureProfile(Contact contact = null, string userId = "")
+        private static async void EnsureProfile(Contact contact)
         {
             try
             {
-                if (contact?.Profile != null) return;
-
-                if (contact == null && !string.IsNullOrEmpty(userId))
-                    contact = Engine.Current.Cloud.Contacts.GetContact(userId);
-
-                if (contact == null) return;
+                if (contact.Profile != null) return;
 
                 User user = await GetUser(contact.ContactUserId);
                 if (user?.Profile == null) return;
@@ -71,7 +91,7 @@ namespace ResoniteFixContactIcons
         private static async Task<User> GetUser(string userId)
         {
             using HttpClient client = new HttpClient();
-            HttpResponseMessage response = await client.GetAsync($"https://api.resonite.com/users/{userId}").ConfigureAwait(false);
+            HttpResponseMessage response = await client.GetAsync($"{Engine.Current.Cloud.ApiEndpoint}/users/{userId}").ConfigureAwait(false);
 
             return response.IsSuccessStatusCode
                 ? JsonSerializer.Deserialize<User>(await response.Content.ReadAsStringAsync())
