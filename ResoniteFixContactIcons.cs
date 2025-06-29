@@ -5,10 +5,9 @@ using ResoniteModLoader;
 using System.Threading.Tasks;
 using System;
 using SkyFrost.Base;
-using System.Collections.Generic;
-using FrooxEngine.UIX;
-using System.Linq;
-using System.Reflection.Emit;
+using System.Net.Http;
+using System.Text.Json;
+using User = SkyFrost.Base.User;
 
 namespace ResoniteFixContactIcons
 {
@@ -18,97 +17,85 @@ namespace ResoniteFixContactIcons
         public override string Author => "NepuShiro";
         public override string Version => "1.0.1";
         public override string Link => "https://github.com/NepuShiro/ResoniteFixContactIcons/";
+        
+        private static readonly HttpClient HttpClient = new HttpClient();
 
         public override void OnEngineInit()
         {
-            Harmony harmony = new("net.NepuShiro.ResoniteFixContactIcons");
-            harmony.PatchAll();
+            // Harmony harmony = new Harmony("net.NepuShiro.ResoniteFixContactIcons");
+            // harmony.PatchAll();
+            
+            Engine.Current.OnReady += () =>
+            {
+                // We could probably find a Method to patch for refreshing all Contacts, but this is fine for now
+                Engine.Current.Cloud.Contacts.ForeachContact(EnsureProfile);
+                
+                Engine.Current.Cloud.Contacts.ContactRemoved += EnsureProfile;
+                Engine.Current.Cloud.Contacts.ContactAdded += EnsureProfile;
+                Engine.Current.Cloud.Contacts.ContactUpdated += EnsureProfile;
+            };
         }
+        
+        // I don't think this is needed, as I can't find a good way to patch this without halting the main thread..
+        // [HarmonyPatch(typeof(NotificationPanel), "AddNotification")]
+        // [HarmonyPatch(new Type[] { typeof(string), typeof(string), typeof(Uri), typeof(colorX), typeof(NotificationType), typeof(string), typeof(Uri), typeof(IAssetProvider<AudioClip>) })]
+        // public class AddNotificationPatch
+        // {
+        //     [HarmonyPrefix]
+        //     private static void Prefix(string userId, ref Uri overrideProfile)
+        //     {
+        //         if (string.IsNullOrEmpty(userId)) return;
+        //         if (overrideProfile != null) return;
+        //         
+        //         UserProfile profile = EnsureProfile(null, userId).GetAwaiter().GetResult();
+        //         overrideProfile = new Uri(profile.IconUrl);
+        //     }
+        // }
 
-        [HarmonyPatch(typeof(NotificationPanel), "AddNotification")]
-        [HarmonyPatch(new Type[] { typeof(string), typeof(string), typeof(Uri), typeof(colorX), typeof(NotificationType), typeof(string), typeof(Uri), typeof(IAssetProvider<AudioClip>) })]
-        public class AddNotificationPatch
+        // There could be a better Method to patch instead of the Contacts Panel to update the Profiles
+        // We might not even need this
+        // [HarmonyPatch(typeof(ContactItem), "Update")]
+        // [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
+        // public static class ContactsPagePatch
+        // {
+        //     [HarmonyPrefix]
+        //     public static void Prefix(ContactItem __instance)
+        //     {
+        //         Contact contact = __instance?.Contact ?? __instance?.Data?.Contact;
+        //         
+        //         if (contact != null)
+        //             EnsureProfile(contact);
+        //     }
+        // }
+        
+        private static void EnsureProfile(ContactData cd)
         {
-            [HarmonyPrefix]
-            private static void Prefix(NotificationPanel __instance, ref string userId, ref Uri overrideProfile)
+            EnsureProfile(cd.Contact);
+        }
+        
+        private static async void EnsureProfile(Contact contact)
+        {
+            try
             {
-                Uri newOverrideProfile = null;
-                string inUserId = userId;
-                
-                Task.Run(async delegate
-                {
-                    if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(inUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
-                    {
-                        newOverrideProfile = result;
-                    }
-                }).GetAwaiter().GetResult();
-                
-                if (newOverrideProfile != null)
-                {
-                    overrideProfile = newOverrideProfile;
-                }
+                if (contact.Profile != null) return;
+
+                User user = await GetUser(contact.ContactUserId);
+                if (user?.Profile == null) return;
+
+                contact.Profile = user.Profile;
+            }
+            catch (Exception e)
+            {
+                Error(e);
             }
         }
-
-        [HarmonyPatch(typeof(ContactItem), "Update")]
-        [HarmonyPatch(new Type[] { typeof(Contact), typeof(ContactData) })]
-        public static class ContactsPagePatch
+        private static async Task<User> GetUser(string userId)
         {
-            [HarmonyPostfix]
-            public static void Postfix(ContactItem __instance, Contact contact, SyncRef<StaticTexture2D> ____thumbnailTexture, SyncRef<Image> ____thumbnail)
-            {
-                Task.Run(async delegate
-                {
-                    if (____thumbnailTexture.Target.URL.Value == null)
-                    {
-                        if (Uri.TryCreate(((await Engine.Current.Cloud.Users.GetUser(contact.ContactUserId))?.Entity?.Profile)?.IconUrl, UriKind.Absolute, out var result))
-                        {
-                            ____thumbnailTexture.Target.URL.Value = result;
-                            ____thumbnail.Target.Tint.Value = colorX.White;
-                        }
-                        
-                        if (____thumbnailTexture.Target.URL.Value == null)
-                        {
-                            ____thumbnailTexture.Target.URL.Value = OfficialAssets.Graphics.Thumbnails.AnonymousHeadset;
-                            ____thumbnail.Target.Tint.Value = LegacyUIStyle.NameTint(contact.ContactUserId);
-                        }
-                    }
-                });
-            }
+            HttpResponseMessage response = await HttpClient.GetAsync($"{Engine.Current.Cloud.ApiEndpoint}/users/{userId}").ConfigureAwait(false);
 
-            [HarmonyTranspiler]
-            public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-            {
-                List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
-                for (int i = 0; i < codes.Count; i++)
-                {
-                    // I know this is cursed, but it works :)
-                    if (codes[i].opcode == OpCodes.Ldarg_0 &&
-                        codes[i + 1].opcode == OpCodes.Ldfld &&
-                        codes[i + 2].opcode == OpCodes.Callvirt &&
-                        codes[i + 3].opcode == OpCodes.Ldfld &&
-                        codes[i + 4].opcode == OpCodes.Call &&
-                        codes[i + 5].opcode == OpCodes.Callvirt &&
-                        codes[i + 6].opcode == OpCodes.Ldarg_0 &&
-                        codes[i + 7].opcode == OpCodes.Ldfld &&
-                        codes[i + 8].opcode == OpCodes.Callvirt &&
-                        codes[i + 9].opcode == OpCodes.Ldfld &&
-                        codes[i + 10].opcode == OpCodes.Ldarg_1 &&
-                        codes[i + 11].opcode == OpCodes.Callvirt &&
-                        codes[i + 12].opcode == OpCodes.Ldc_R4 &&
-                        codes[i + 13].opcode == OpCodes.Call &&
-                        codes[i + 14].opcode == OpCodes.Callvirt)
-                    {
-                        for (int j = 0; j <= 14; j++)
-                        {
-                            codes[i + j].opcode = OpCodes.Nop;
-                        }
-                        Msg($"Replaced the No-Bueno Icon Code at [{i}] {codes[i]} - [{i + 14}] {codes[i + 14]}");
-                    }
-                }
-                
-                return codes.AsEnumerable();
-            }
+            return response.IsSuccessStatusCode
+                ? JsonSerializer.Deserialize<User>(await response.Content.ReadAsStringAsync())
+                : null;
         }
     }
 }
