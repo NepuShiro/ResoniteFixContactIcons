@@ -15,7 +15,7 @@ namespace ResoniteFixContactIcons
     {
         public override string Name => "ResoniteFixContactIcons";
         public override string Author => "NepuShiro";
-        public override string Version => "1.0.1";
+        public override string Version => "1.1.0";
         public override string Link => "https://github.com/NepuShiro/ResoniteFixContactIcons/";
         
         private static readonly HttpClient HttpClient = new HttpClient();
@@ -73,7 +73,7 @@ namespace ResoniteFixContactIcons
             EnsureProfile(cd.Contact);
         }
         
-        private static async void EnsureProfile(Contact contact)
+        private async static void EnsureProfile(Contact contact)
         {
             try
             {
@@ -89,7 +89,7 @@ namespace ResoniteFixContactIcons
                 Error(e);
             }
         }
-        private static async Task<User> GetUser(string userId)
+        private async static Task<User> GetUser(string userId)
         {
             HttpResponseMessage response = await HttpClient.GetAsync($"{Engine.Current.Cloud.ApiEndpoint}/users/{userId}").ConfigureAwait(false);
 
