@@ -3,7 +3,7 @@
 		<RootNamespace>ResoniteFixContactIcons</RootNamespace>
 		<AssemblyName>ResoniteFixContactIcons</AssemblyName>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-		<TargetFramework>net472</TargetFramework>
+		<TargetFramework>net9.0</TargetFramework>
 		<FileAlignment>512</FileAlignment>
 		<LangVersion>10.0</LangVersion>
 		<Nullable>disable</Nullable>
@@ -33,34 +33,23 @@
 			<Private>False</Private>
 		</Reference>
 		<Reference Include="FrooxEngine">
-		    <HintPath>$(GamePath)Resonite_Data\Managed\FrooxEngine.dll</HintPath>
+		    <HintPath>$(GamePath)FrooxEngine.dll</HintPath>
 		    <Private>False</Private>
 		</Reference>
 		<Reference Include="Elements.Assets">
-			<HintPath>$(GamePath)Resonite_Data\Managed\Elements.Assets.dll</HintPath>
+			<HintPath>$(GamePath)Elements.Assets.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
 		<Reference Include="Elements.Core">
-			<HintPath>$(GamePath)Resonite_Data\Managed\Elements.Core.dll</HintPath>
+			<HintPath>$(GamePath)Elements.Core.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
 		<Reference Include="SkyFrost.Base">
-			<HintPath>$(GamePath)Resonite_Data\Managed\SkyFrost.Base.dll</HintPath>
+			<HintPath>$(GamePath)SkyFrost.Base.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
 		<Reference Include="SkyFrost.Base.Models">
-			<HintPath>$(GamePath)Resonite_Data\Managed\SkyFrost.Base.Models.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="System.Net.Http">
-		  <HintPath>$(GamePath)Resonite_Data\Managed\System.Net.Http.dll</HintPath>
-			<Private>False</Private>
-		</Reference>
-		<Reference Include="System.Text.Json">
-			<HintPath>$(GamePath)Resonite_Data\Managed\System.Text.Json.dll</HintPath>
-			<Private>False</Private>
-		</Reference>	<Reference Include="System.Memory">
-			<HintPath>$(GamePath)Resonite_Data\Managed\System.Memory.dll</HintPath>
+			<HintPath>$(GamePath)SkyFrost.Base.Models.dll</HintPath>
 			<Private>False</Private>
 		</Reference>
 	</ItemGroup>
